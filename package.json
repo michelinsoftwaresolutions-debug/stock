@@ -1,0 +1,16 @@
+{
+  "name": "sistema-gestion-ventas",
+  "version": "1.0.0",
+  "description": "Sistema POS de Gestión de Ventas",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^45.0.0",
+    "electron-packager": "^17.1.2"
+  }
+}
