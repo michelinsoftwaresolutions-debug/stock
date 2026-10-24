@@ -730,6 +730,76 @@ window.deleteCategory = async function(categoryId) {
     }
 
     if (!confirm(`¿Está seguro de que desea eliminar la categoría "${category.name}"?`)) return;
+    window.deleteCategory = async function(categoryId) {
+    const category = categories.find(c => c.id === categoryId);
+    if (!category) return;
+
+    const categoryProducts = products.filter(p => p.categoryId === categoryId);
+    if (categoryProducts.length > 0) {
+        showAlert(`No se puede eliminar la categoría "${category.name}" porque tiene ${categoryProducts.length} producto(s) asociado(s)`, 'error');
+        return;
+    }
+
+    if (!confirm(`¿Está seguro de que desea eliminar la categoría "${category.name}"?`)) return;
+
+    categories = categories.filter(c => c.id !== categoryId);
+    if (typeof updateCategoriesTable === 'function') updateCategoriesTable();
+    if (typeof updateProductCategories === 'function') updateProductCategories();
+    if (typeof updateDashboard === 'function') updateDashboard();
+    if (typeof saveToFirebase === 'function') {
+        await saveToFirebase('categories', categories);
+    }
+    showAlert('Categoría eliminada correctamente', 'success');
+};
+
+// Función para evitar el error de logo en la línea 233
+function loadSavedLogo() {
+    const savedLogo = localStorage.getItem('pos_custom_logo');
+    if (savedLogo) {
+        const logoImg = document.getElementById('businessLogo');
+        if (logoImg) logoImg.src = savedLogo;
+    }
+}
+window.loadSavedLogo = loadSavedLogo;
+
+// Función para eliminar producto
+window.deleteProduct = async function(productId, e) {
+    if (e && e.preventDefault) e.preventDefault();
+    if (window.event) window.event.preventDefault();
+
+    const product = products.find(p => p.id == productId);
+    const productName = product ? product.name : 'este producto';
+
+    if (!confirm(`¿Está seguro de que desea eliminar "${productName}"?`)) {
+        return;
+    }
+
+    products = products.filter(p => p.id != productId);
+
+    localStorage.setItem('products', JSON.stringify(products));
+
+    if (typeof saveToFirebase === 'function') {
+        await saveToFirebase('products', products);
+    }
+
+    if (typeof updateProductsTable === 'function') {
+        updateProductsTable();
+    } else if (typeof renderProducts === 'function') {
+        renderProducts();
+    }
+
+    if (typeof updateDashboard === 'function') {
+        updateDashboard();
+    }
+
+    if (typeof showAlert === 'function') {
+        showAlert('Producto eliminado correctamente', 'success');
+    }
+
+    // 4. Notificación visual
+    showAlert('Producto eliminado correctamente', 'success');
+}
+window.deleteProduct = deleteProduct;
 
     categories = categories.filter(c => c.id !== categoryId);
     updateCategoriesTable();
@@ -2158,6 +2228,34 @@ function exportReportsExcel() {
     }));
     downloadExcel(data, 'Reporte de Productos', 'Reporte_Productos_Vendidos');
 }
+function loadSavedLogo() {
+    const savedLogo = localStorage.getItem('pos_custom_logo');
+    if (savedLogo) {
+        const logoImg = document.getElementById('businessLogo');
+        if (logoImg) logoImg.src = savedLogo;
+    }
+}
+window.deleteProduct = async function(productId) {
+    const product = products.find(p => p.id == productId);
+    const productName = product ? product.name : 'este producto';
+
+    if (!confirm(`¿Está seguro de que desea eliminar "${productName}"?`)) return;
+
+    // 1. Quitar el producto de la lista
+    products = products.filter(p => p.id != productId);
+
+    // 2. Guardar en el navegador y en la base de datos de Firebase
+    localStorage.setItem('products', JSON.stringify(products));
+    if (typeof saveToFirebase === 'function') {
+        await saveToFirebase('products', products);
+    }
+
+    // 3. Actualizar la tabla y el panel sin recargar la pantalla
+    if (typeof updateProductsTable === 'function') updateProductsTable();
+    if (typeof updateDashboard === 'function') updateDashboard();
+    if (typeof showAlert === 'function') showAlert('Producto eliminado correctamente', 'success');
+};
+
 
 // Vincular funciones a la ventana global
 Object.assign(window, {
