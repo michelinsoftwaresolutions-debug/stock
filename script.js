@@ -161,19 +161,32 @@ window.handleAuth = async function(e) {
     }
 };
 
-// 3. Recuperar contraseña
+// Recuperar contraseña con avisos claros y tilde verde
 window.resetPassword = async function(e) {
-    if (e) e.preventDefault();
-    const email = document.getElementById('authEmail').value.trim();
+    if (e && e.preventDefault) e.preventDefault();
+    if (window.event) window.event.preventDefault();
+
+    const emailInput = document.getElementById('authEmail') || document.getElementById('loginEmail');
+    const email = emailInput ? emailInput.value.trim() : '';
+
     if (!email) {
-        showAlert('Ingresa tu correo en el campo superior primero', 'error');
+        showAlert('⚠️ Por favor, ingresa tu correo electrónico en el campo superior primero', 'error');
         return;
     }
+
     try {
         await sendPasswordResetEmail(auth, email);
-        showAlert('Correo de restablecimiento enviado. Revisa tu casilla.', 'success');
+        showAlert('✅ Se envió el correo de restablecimiento. Revisa tu bandeja de entrada o spam.', 'success');
     } catch (error) {
-        showAlert('No se pudo enviar el correo: ' + error.message, 'error');
+        if (error.message && error.message.includes('RESET_PASSWORD_EXCEED_LIMIT')) {
+            showAlert('⚠️ Límite de intentos alcanzado. Por seguridad de Google, espera unos 15 minutos antes de volver a intentar.', 'error');
+        } else if (error.code === 'auth/user-not-found') {
+            showAlert('❌ No existe ninguna cuenta registrada con este correo.', 'error');
+        } else if (error.code === 'auth/invalid-email') {
+            showAlert('❌ El formato del correo es inválido (ejemplo: usuario@correo.com).', 'error');
+        } else {
+            showAlert('❌ Error al enviar el correo: ' + error.message, 'error');
+        }
     }
 };
 
@@ -309,21 +322,28 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
             showAlert('Sesión iniciada correctamente', 'success');
         }
     } catch (error) {
-        let errorMessage = 'Error en la autenticación';
-        if (error.code === 'auth/user-not-found') {
-            errorMessage = 'Usuario no encontrado';
-        } else if (error.code === 'auth/wrong-password') {
-            errorMessage = 'Contraseña incorrecta';
-        } else if (error.code === 'auth/email-already-in-use') {
-            errorMessage = 'El email ya está en uso';
-        } else if (error.code === 'auth/weak-password') {
-            errorMessage = 'La contraseña debe tener al menos 6 caracteres';
-        }
-        showAlert(errorMessage, 'error');
-    } finally {
-        showLoading(false);
-        loginBtn.disabled = false;
+    console.error('Error de autenticación:', error);
+    let errorMessage = '❌ Error al iniciar sesión';
+
+    const errStr = (error.message || '') + ' ' + (error.code || '');
+
+    if (
+        error.code === 'auth/invalid-credential' || 
+        error.code === 'auth/wrong-password' || 
+        error.code === 'auth/user-not-found' ||
+        errStr.includes('INVALID_LOGIN_CREDENTIALS')
+    ) {
+        errorMessage = '❌ Correo o contraseña incorrectos. Verifica tus datos.';
+    } else if (error.code === 'auth/invalid-email') {
+        errorMessage = '❌ El formato del correo no es válido (ejemplo: usuario@correo.com).';
+    } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = '⚠️ Demasiados intentos fallidos. Por seguridad, espera unos minutos.';
+    } else {
+        errorMessage = '❌ ' + (error.message || 'Error en la autenticación');
     }
+
+    showAlert(errorMessage, 'error');
+}
 });
 
 window.logout = async function() {
