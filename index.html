@@ -2017,50 +2017,52 @@ body > .alert {
 </script>
 </body>
 </html>
-let helpMode = false;
+<script>
+  let helpMode = false;
 
-// Crear el elemento flotante en pantalla
-const tooltip = document.createElement('div');
-tooltip.id = 'helpTooltip';
-document.body.appendChild(tooltip);
+  // Crear el elemento flotante en pantalla
+  const tooltip = document.createElement('div');
+  tooltip.id = 'helpTooltip';
+  document.body.appendChild(tooltip);
 
-// Función para activar / desactivar el modo ayuda
-function toggleHelpMode() {
-    helpMode = !helpMode;
-    document.body.classList.toggle('help-mode-active', helpMode);
-    
-    const btn = document.getElementById('toggleHelpBtn');
-    if (btn) {
-        btn.style.backgroundColor = helpMode ? '#dbeafe' : '#ffffff';
-        btn.style.borderColor = helpMode ? '#3b82f6' : '#cbd5e1';
-        btn.querySelector('span').textContent = helpMode ? 'Desactivar Ayuda' : 'Activar Ayuda';
-    }
+  // Función para activar / desactivar el modo ayuda
+  function toggleHelpMode() {
+      helpMode = !helpMode;
+      document.body.classList.toggle('help-mode-active', helpMode);
+      
+      const btn = document.getElementById('toggleHelpBtn');
+      if (btn) {
+          btn.style.backgroundColor = helpMode ? '#dbeafe' : '#ffffff';
+          btn.style.borderColor = helpMode ? '#3b82f6' : '#cbd5e1';
+          btn.querySelector('span').textContent = helpMode ? 'Desactivar Ayuda' : 'Activar Ayuda';
+      }
 
-    if (!helpMode) {
-        tooltip.style.display = 'none';
-    }
-}
+      if (!helpMode) {
+          tooltip.style.display = 'none';
+      }
+  }
 
-// Controlar la posición del cartel flotante
-document.addEventListener('mouseover', (e) => {
-    if (!helpMode) return;
-    const target = e.target.closest('[data-help]');
-    if (target) {
-        tooltip.textContent = target.getAttribute('data-help');
-        tooltip.style.display = 'block';
-    }
-});
+  // Controlar la posición del cartel flotante
+  document.addEventListener('mouseover', (e) => {
+      if (!helpMode) return;
+      const target = e.target.closest('[data-help]');
+      if (target) {
+          tooltip.textContent = target.getAttribute('data-help');
+          tooltip.style.display = 'block';
+      }
+  });
 
-document.addEventListener('mousemove', (e) => {
-    if (!helpMode || tooltip.style.display !== 'block') return;
-    tooltip.style.left = (e.clientX + 14) + 'px';
-    tooltip.style.top = (e.clientY + 14) + 'px';
-});
+  document.addEventListener('mousemove', (e) => {
+      if (!helpMode || tooltip.style.display !== 'block') return;
+      tooltip.style.left = (e.clientX + 14) + 'px';
+      tooltip.style.top = (e.clientY + 14) + 'px';
+  });
 
-document.addEventListener('mouseout', (e) => {
-    if (!helpMode) return;
-    const target = e.target.closest('[data-help]');
-    if (target) {
-        tooltip.style.display = 'none';
-    }
-});
+  document.addEventListener('mouseout', (e) => {
+      if (!helpMode) return;
+      const target = e.target.closest('[data-help]');
+      if (target) {
+          tooltip.style.display = 'none';
+      }
+  });
+</script>
