@@ -56,47 +56,35 @@ window.toggleAuthMode = function(e) {
 // ==========================================
 // CONTROL DE TIEMPO DE SESIÓN
 // ==========================================
+// --- Control del Temporizador de Sesión ---
 let sessionTimerInterval = null;
+let sessionSeconds = 0;
 
 function startSessionTimer() {
-    let sessionStart = sessionStorage.getItem('sessionStartTime');
-    
-    // Si no existe hora de inicio guardada, se toma la actual
-    if (!sessionStart) {
-        sessionStart = new Date().toISOString();
-        sessionStorage.setItem('sessionStartTime', sessionStart);
+    const startEl = document.getElementById('sessionStartTime');
+
+    // 1. Fijar la hora en que inició sesión (HH:MM)
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+
+    if (startEl) {
+        startEl.innerHTML = '🕒 <strong>Inicio:</strong> ' + hours + ':' + minutes;
     }
 
-    const startDate = new Date(sessionStart);
-    
-    // Mostrar la fecha y hora de inicio formateada (DD/MM/AAAA HH:mm)
-    const startElem = document.getElementById('sessionStartTime');
-    if (startElem) {
-        const dia = String(startDate.getDate()).padStart(2, '0');
-        const mes = String(startDate.getMonth() + 1).padStart(2, '0');
-        const hora = String(startDate.getHours()).padStart(2, '0');
-        const min = String(startDate.getMinutes()).padStart(2, '0');
-        startElem.innerHTML = `🕒 <strong>Inicio:</strong> ${dia}/${mes} ${hora}:${min}`;
-    }
-
-    const container = document.getElementById('sessionInfoContainer');
-    if (container) container.style.display = 'inline-flex';
-
-    // Actualizar el cronómetro cada segundo
+    // 2. Iniciar el cronómetro de tiempo activo
     if (sessionTimerInterval) clearInterval(sessionTimerInterval);
+    sessionSeconds = 0;
+
     sessionTimerInterval = setInterval(() => {
-        const now = new Date();
-        const diffSeconds = Math.floor((now - startDate) / 1000);
+        sessionSeconds++;
+        const hrs = String(Math.floor(sessionSeconds / 3600)).padStart(2, '0');
+        const mins = String(Math.floor((sessionSeconds % 3600) / 60)).padStart(2, '0');
+        const secs = String(sessionSeconds % 60).padStart(2, '0');
 
-        if (diffSeconds >= 0) {
-            const h = String(Math.floor(diffSeconds / 3600)).padStart(2, '0');
-            const m = String(Math.floor((diffSeconds % 3600) / 60)).padStart(2, '0');
-            const s = String(diffSeconds % 60).padStart(2, '0');
-
-            const elapsedElem = document.getElementById('sessionElapsedTime');
-            if (elapsedElem) {
-                elapsedElem.innerHTML = `⏱️ <strong>Activo:</strong> ${h}:${m}:${s}`;
-            }
+        const elapsedEl = document.getElementById('sessionElapsedTime');
+        if (elapsedEl) {
+            elapsedEl.innerHTML = '⏱️ <strong>Activo:</strong> ' + hrs + ':' + mins + ':' + secs;
         }
     }, 1000);
 }
@@ -106,9 +94,13 @@ function stopSessionTimer() {
         clearInterval(sessionTimerInterval);
         sessionTimerInterval = null;
     }
-    sessionStorage.removeItem('sessionStartTime');
-    const container = document.getElementById('sessionInfoContainer');
-    if (container) container.style.display = 'none';
+    sessionSeconds = 0;
+
+    const startEl = document.getElementById('sessionStartTime');
+    const elapsedEl = document.getElementById('sessionElapsedTime');
+
+    if (startEl) startEl.innerHTML = '🕒 <strong>Inicio:</strong> --:--';
+    if (elapsedEl) elapsedEl.innerHTML = '⏱️ <strong>Activo:</strong> 00:00:00';
 }
 // 2. Procesar el formulario (Login o Registro según corresponda)
 window.handleAuth = async function(e) {
@@ -130,9 +122,24 @@ window.handleAuth = async function(e) {
             await createUserWithEmailAndPassword(auth, email, password);
             showAlert('¡Cuenta creada con éxito! Bienvenido', 'success');
         } else {
-            // INICIO DE SESIÓN MODULAR
-            await signInWithEmailAndPassword(auth, email, password);
-            showAlert('Sesión iniciada correctamente', 'success');
+          // INICIO DE SESIÓN MODULAR
+        await signInWithEmailAndPassword(auth, email, password);
+        showAlert('✅ Sesión iniciada correctamente', 'success');
+
+        // Apagar spinner y mostrar la app
+        showLoading(false);
+        showMainApp();
+
+            const authModal = document.getElementById('authModal') || 
+                              document.getElementById('loginModal') || 
+                              document.querySelector('.auth-container') || 
+                              document.querySelector('.login-container');
+            if (authModal) authModal.style.display = 'none';
+
+            const appContainer = document.getElementById('mainContent') || 
+                                 document.getElementById('appContainer') || 
+                                 document.querySelector('.app-container');
+            if (appContainer) appContainer.style.display = 'block';
         }
     } catch (error) {
         console.error('Error de Firebase Auth:', error.code, error.message);
@@ -194,7 +201,8 @@ window.resetPassword = async function(e) {
 window.logout = async function() {
     try {
         await signOut(auth);
-        showAlert('Sesión cerrada', 'success');
+        showAlert('Sesión cerrada correctamente', 'success');
+        showLoginScreen(); // <-- Agregar esta línea aquí
     } catch (error) {
         showAlert('Error al salir: ' + error.message, 'error');
     }
@@ -225,6 +233,7 @@ function formatMoney(amount) {
 document.addEventListener('DOMContentLoaded', function() {
     showLoading(true);
     checkAuthState();
+    updateDateTime(); // <-- Agregar aquí
     const barcodeInput = document.getElementById('saleBarcodeScanInput');
     if (barcodeInput) {
         barcodeInput.addEventListener('keyup', handleBarcodeScan);
@@ -233,30 +242,63 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Autenticación
 function checkAuthState() {
-    onAuthStateChanged(auth, (user) => {
-        showLoading(false);
+    onAuthStateChanged(auth, async (user) => {
         if (user) {
-            currentUser = user;
-            isLoggedIn = true;
-            document.getElementById('userEmail').textContent = user.email;
+            showLoading(false);
             showMainApp();
-            loadUserData();
-            startAutoBackup();
+
+            // 1. Mostrar el correo del usuario
+            const emailSpan = document.getElementById('userEmail');
+            if (emailSpan && user.email) {
+                emailSpan.textContent = user.email;
+            }
+
+            // 2. Iniciar el temporizador
             startSessionTimer();
-            loadSavedLogo();
-            loadSavedLogo();
+
+            // 3. Cargar datos del usuario y dashboard
+            try {
+                if (typeof loadUserData === 'function') await loadUserData();
+                if (typeof updateDashboard === 'function') updateDashboard();
+            } catch (err) {
+                console.error('Error al cargar datos tras iniciar sesión:', err);
+            }
         } else {
-            currentUser = null;
-            isLoggedIn = false;
-            showLoginScreen();
+            // 4. Detener reloj si no hay sesión
             stopSessionTimer();
+
+            const emailSpan = document.getElementById('userEmail');
+            if (emailSpan) emailSpan.textContent = 'usuario@ejemplo.com';
+
+            showLoading(false);
+            showLoginScreen();
         }
     });
 }
-
 function showLoginScreen() {
-    document.getElementById('loginScreen').style.display = 'flex';
-    document.getElementById('mainApp').style.display = 'none';
+    const loginScreen = document.getElementById('loginScreen');
+    const mainApp = document.getElementById('mainApp');
+    if (loginScreen) loginScreen.style.display = 'flex';
+    if (mainApp) mainApp.style.display = 'none';
+
+    // 1. Apagar cualquier spinner activo
+    if (typeof showLoading === 'function') showLoading(false);
+
+    // 2. Reactivar el botón de Iniciar Sesión y restaurar el cursor
+    const loginBtn = document.getElementById('loginBtn') || 
+                     document.querySelector('#loginScreen button[type="submit"]') || 
+                     document.querySelector('#loginScreen button');
+
+    if (loginBtn) {
+        loginBtn.disabled = false;
+        loginBtn.removeAttribute('disabled');
+        loginBtn.style.pointerEvents = 'auto';
+        loginBtn.style.cursor = 'pointer';
+    }
+
+    // 3. (Opcional) Limpiar el campo de contraseña por seguridad
+    const passInput = document.getElementById('authPassword') || document.getElementById('loginPassword') || document.querySelector('#loginScreen input[type="password"]');
+    if (passInput) passInput.value = '';
 }
 
 function showMainApp() {
@@ -264,10 +306,11 @@ function showMainApp() {
     document.getElementById('mainApp').style.display = 'block';
 }
 
-function showLoading(show) {
+window.showLoading = function(show) {
     const spinner = document.getElementById('loadingSpinner');
     if (spinner) spinner.style.display = show ? 'block' : 'none';
-}
+};
+const showLoading = window.showLoading;
 
 window.toggleAuthMode = function() {
     const loginBtn = document.getElementById('loginBtn');
@@ -292,8 +335,50 @@ window.resetPassword = async function() {
     try {
         await sendPasswordResetEmail(auth, email);
         showAlert('Email de recuperación enviado correctamente', 'success');
-    } catch (error) {
-        showAlert('Error al enviar email de recuperación: ' + error.message, 'error');
+   } catch (error) {
+        console.error('Error de autenticación:', error.code, error.message);
+
+        // 1. Apagar el círculo de carga inmediatamente
+        if (typeof showLoading === 'function') showLoading(false);
+
+        // 2. Reactivar el botón de login para permitir reintentar
+        const loginBtn = document.getElementById('loginBtn') || 
+                         document.querySelector('#loginScreen button[type="submit"]') || 
+                         document.querySelector('#loginScreen button');
+        if (loginBtn) {
+            loginBtn.disabled = false;
+            loginBtn.removeAttribute('disabled');
+            loginBtn.style.pointerEvents = 'auto';
+            loginBtn.style.cursor = 'pointer';
+        }
+
+        // 3. Identificar el mensaje de error para el usuario
+        let errorMessage = '❌ Error al iniciar sesión';
+
+        switch (error.code) {
+            case 'auth/invalid-credential':
+            case 'auth/wrong-password':
+            case 'auth/user-not-found':
+                errorMessage = '❌ Correo o contraseña incorrectos. Verifica tus datos.';
+                break;
+            case 'auth/invalid-email':
+                errorMessage = '❌ El formato del correo es inválido.';
+                break;
+            case 'auth/email-already-in-use':
+                errorMessage = '⚠️ Este correo ya está registrado.';
+                break;
+            case 'auth/weak-password':
+                errorMessage = '⚠️ La contraseña debe tener al menos 6 caracteres.';
+                break;
+            case 'auth/too-many-requests':
+                errorMessage = '⚠️ Demasiados intentos fallidos. Espera unos minutos.';
+                break;
+            default:
+                errorMessage = '❌ ' + (error.message || 'Error en la autenticación');
+                break;
+        }
+
+        showAlert(errorMessage, 'error');
     }
 };
 
@@ -313,37 +398,46 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
     showLoading(true);
     loginBtn.disabled = true;
 
-    try {
+  try {
         if (isRegister) {
             await createUserWithEmailAndPassword(auth, email, password);
             showAlert('Cuenta creada exitosamente', 'success');
         } else {
             await signInWithEmailAndPassword(auth, email, password);
             showAlert('Sesión iniciada correctamente', 'success');
+            showMainApp();
         }
     } catch (error) {
-    console.error('Error de autenticación:', error);
-    let errorMessage = '❌ Error al iniciar sesión';
+        console.error('Error de autenticación:', error);
+        let errorMessage = '❌ Error al iniciar sesión';
 
-    const errStr = (error.message || '') + ' ' + (error.code || '');
+        const errStr = (error.message || '') + ' ' + (error.code || '');
 
-    if (
-        error.code === 'auth/invalid-credential' || 
-        error.code === 'auth/wrong-password' || 
-        error.code === 'auth/user-not-found' ||
-        errStr.includes('INVALID_LOGIN_CREDENTIALS')
-    ) {
-        errorMessage = '❌ Correo o contraseña incorrectos. Verifica tus datos.';
-    } else if (error.code === 'auth/invalid-email') {
-        errorMessage = '❌ El formato del correo no es válido (ejemplo: usuario@correo.com).';
-    } else if (error.code === 'auth/too-many-requests') {
-        errorMessage = '⚠️ Demasiados intentos fallidos. Por seguridad, espera unos minutos.';
-    } else {
-        errorMessage = '❌ ' + (error.message || 'Error en la autenticación');
+        if (
+            error.code === 'auth/invalid-credential' ||
+            error.code === 'auth/wrong-password' ||
+            error.code === 'auth/user-not-found' ||
+            errStr.includes('INVALID_LOGIN_CREDENTIALS')
+        ) {
+            errorMessage = '❌ Correo o contraseña incorrectos. Verifica tus datos.';
+        } else if (error.code === 'auth/invalid-email') {
+            errorMessage = '❌ El formato del correo es inválido.';
+        } else if (error.code === 'auth/too-many-requests') {
+            errorMessage = '⚠️ Demasiados intentos fallidos. Espera unos minutos.';
+        } else {
+            errorMessage = '❌ ' + (error.message || 'Error en la autenticación');
+        }
+
+        showAlert(errorMessage, 'error');
+    } finally {
+        // Esto se ejecuta SIEMPRE: apaga el círculo y reactiva el botón
+        showLoading(false);
+        if (loginBtn) {
+            loginBtn.disabled = false;
+            loginBtn.style.pointerEvents = 'auto';
+            loginBtn.style.cursor = 'pointer';
+        }
     }
-
-    showAlert(errorMessage, 'error');
-}
 });
 
 window.logout = async function() {
@@ -2302,3 +2396,27 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+// Función para actualizar fecha y hora en vivo
+function updateDateTime() {
+    const now = new Date();
+    
+    // Opciones de formato en español
+    const dateOptions = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
+    const dateStr = now.toLocaleDateString('es-ES', dateOptions);
+    const timeStr = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    // Buscar los contenedores típicos de fecha y hora
+    const dateTimeEl = document.getElementById('currentDateTime') || document.getElementById('dateTimeDisplay');
+    const dateEl = document.getElementById('currentDate') || document.getElementById('currentDateDisplay');
+    const timeEl = document.getElementById('currentTime') || document.getElementById('currentTimeDisplay');
+
+    if (dateTimeEl) {
+        dateTimeEl.textContent = `${dateStr} - ${timeStr}`;
+    }
+    if (dateEl) dateEl.textContent = dateStr;
+    if (timeEl) timeEl.textContent = timeStr;
+}
+
+// Iniciar el reloj y actualizarlo cada segundo
+setInterval(updateDateTime, 1000);
+updateDateTime();
